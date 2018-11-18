@@ -1,6 +1,4 @@
-#include <iostream>
-
-int main (int argc, char* argv[], char* envp[]) {
+int main () {
    int k = 42;
    int a = k + k;
    int d = (a + a) - (a - a);

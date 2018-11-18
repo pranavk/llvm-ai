@@ -53,7 +53,7 @@ public:
 	    }
 	}
 
-
+	dumpAnalysis();
 
 	return false;
     }
@@ -146,6 +146,12 @@ private:
     }
 
     std::pair<LatticeVal, ConstantRange*> getCurrentValue(Value* val) {
+	if (auto* cint = dyn_cast<ConstantInt>(val)) {
+	    outs() << "getCurrentValue: is a const inst: " << "\n";
+	    _mapLatticeVals[val] = LatticeVal::ConstantRange;
+	    _mapRanges[val] = new ConstantRange(cint->getValue());
+	}
+
 	assert(_mapLatticeVals.find(val) != _mapLatticeVals.end());
 	assert(_mapRanges.find(val) != _mapRanges.end());
 
@@ -192,12 +198,25 @@ private:
     }
 
     void dumpAnalysis() {
+	outs() << "Dump Analysis Results\n";
+	outs() << "========================\n";
+
 	for (auto& val : _mapRanges) {
 	    if (!isa<Instruction>(val.first))
 		continue;
 	    outs() << *cast<Instruction>(val.first) << "\n";
-	    outs() << "\tResult: "
-		   << val.second << "\n";
+	    if (!val.second) {
+		outs() << "No result\n";
+		continue;
+	    }
+	    else if (auto sele = val.second->getSingleElement()) {
+		outs() << "\tResult: "
+		       << *sele << "\n";
+	    }
+	    else {
+		outs() << "Result: "
+		       << *val.second << "\n";
+	    }
 	}
     }
 };
