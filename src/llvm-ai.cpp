@@ -7,9 +7,12 @@
 #include "llvm/IR/Function.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
+
+#define DEBUG_TYPE "llvm-ai"
 
 enum class LatticeVal : char {
     // don't need any Top because ConstantRange will be limited
@@ -28,9 +31,6 @@ public:
 	std::queue<Value*> worklist = init(F);
 	while (!worklist.empty()) {
 	    Value* val = worklist.front(); worklist.pop();
-
-	    if (isa<Instruction>(val))
-		outs() << *cast<Instruction>(val) << "\n";
 
 	    std::pair<LatticeVal, ConstantRange*> oldres = getCurrentValue(val);
 	    std::pair<LatticeVal, ConstantRange*> newres = processValue(val);
@@ -74,30 +74,28 @@ private:
 	    return {LatticeVal::Bottom, nullptr};
 
 	unsigned bitWidth = val->getType()->getIntegerBitWidth();
-	outs() << "processValue: bitWidth: " << bitWidth << "\n";
+	LLVM_DEBUG(dbgs() << "processValue: bitWidth: " << bitWidth << "\n");
 
 	if (auto *fnarg = dyn_cast<Argument>(val)) {
-	    outs() << "processValue: is a fn arg: " << "\n";
-	    outs() << fnarg->getParent() << "\n";
+	    LLVM_DEBUG(dbgs() << "processValue: is a fn arg: " << "\n");
+	    LLVM_DEBUG(dbgs() << fnarg->getParent() << "\n");
 	    return {LatticeVal::ConstantRange,
 		    new ConstantRange(bitWidth, true)};
 	}
 	else if (auto* cint = dyn_cast<ConstantInt>(val)) {
-	    outs() << "processValue: is a const inst: " << "\n";
+	    LLVM_DEBUG(dbgs() << "processValue: is a const inst: " << "\n");
 	    return {LatticeVal::ConstantRange,
 		    new ConstantRange(cint->getValue())};
 	}
 	else if (auto* callinst = dyn_cast<CallInst>(val)) {
-	    outs() << "processValue: is a call inst: " << "\n";
+	    LLVM_DEBUG(dbgs() << "processValue: is a call inst: " << "\n");
 	    return {LatticeVal::ConstantRange,
 		    new ConstantRange(bitWidth, true)};
 	}
 	else if (auto* inst = dyn_cast<Instruction>(val)) {
-	    outs() << "processValue: xfunc\n";
+	    LLVM_DEBUG(dbgs() << "processValue: xfunc\n");
 	    return xfunc(val);
 	}
-
-	outs() << "nothing processed\n";
     }
 
     // execute appropriate transfer function on val
@@ -147,7 +145,7 @@ private:
 
     std::pair<LatticeVal, ConstantRange*> getCurrentValue(Value* val) {
 	if (auto* cint = dyn_cast<ConstantInt>(val)) {
-	    outs() << "getCurrentValue: is a const inst: " << "\n";
+	    LLVM_DEBUG(dbgs() << "getCurrentValue: is a const inst: " << "\n");
 	    _mapLatticeVals[val] = LatticeVal::ConstantRange;
 	    _mapRanges[val] = new ConstantRange(cint->getValue());
 	}
@@ -174,10 +172,10 @@ private:
 	}
 
 	std::queue<Value*> worklist;
-	outs() << "initing\n";
+	LLVM_DEBUG(dbgs() << "initing\n");
 	for (auto& BB : F) {
 	    for (auto& I : BB) {
-		outs() << I << "\n";
+		LLVM_DEBUG(dbgs() << I << "\n");
 		Value* val = cast<Value>(&I);
 
 		std::pair<LatticeVal, ConstantRange*> res = processValue(val);
